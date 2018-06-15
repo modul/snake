@@ -1,0 +1,22 @@
+name:                snake
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/modul/snake#readme
+license:             BSD3
+author:              Remo Giermann
+maintainer:          mo@liberejo.de
+copyright:           (c) Remo Giermann
+category:            Experimental
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - gloss 
+  - random
+
+executables:
+  snake:
+    source-dirs:      src
+    main:             Main.hs
