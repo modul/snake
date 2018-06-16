@@ -9,6 +9,7 @@ import Graphics.Gloss.Interface.Environment
 
 import Data.Function ((&))
 import Data.Semigroup
+import System.Random
 
 type Time = Float
 
@@ -42,21 +43,20 @@ instance Semigroup Heading where
 pixelsize = 20
 
 initSnake = Snake [(0, 0), (0, 0), (0, 0)] East 
-initGame = Game 0 0 Running initSnake 5 0 [] [(-80, -400)]
+initGame = Game 0 0 Running initSnake 10 0 [] [(-80, -400)]
 
 turn :: Snake -> Heading -> Snake
 turn s@Snake{..} direction = s {heading = heading <> direction}
 
 render :: Game -> Picture
-render Game{..} = pictures $ drawSnake snake ++ drawFood food
-
+render Game{..} = pictures $ drawFood food : drawSnake snake 
 
 pixelShape = rectangleSolid pixelsize pixelsize
 foodShape = circleSolid (pixelsize/2)
 
 draw shape clr (x, y) = shape & translate x y & color clr
 drawPixel = draw pixelShape white
-drawFood = map (draw foodShape cyan)
+drawFood = draw foodShape cyan . head
 drawSnake Snake{..} = map drawPixel shape 
 
 handle :: Event -> Game -> Game
@@ -67,7 +67,7 @@ handle (EventKey (SpecialKey KeyLeft  ) Down _ _) g@Game{..} = g {changeHead = c
 handle _ game = game
 
 update :: Time -> Game -> Game
-update dt g@Game{..} = trace (show . head . shape $ snake) $ up g {age = age + dt}
+update dt g@Game{..} = up g {age = age + dt}
     where newHeading x = if not (null changeHead) then turn x (head changeHead) else x
           doUpdate = lastDraw + period < age
           period = 1 / speed
@@ -80,11 +80,12 @@ update dt g@Game{..} = trace (show . head . shape $ snake) $ up g {age = age + d
           (snake', food') = eat food snake
 
 eat fs (Snake shape h) = (Snake shape' h,  food')
-    where (shape', food') = if m `elem` fs 
-                             then (m : shape, (0, 0) : [f | f <- fs, f /= m])  
+    where (shape', food') = if m == f 
+                             then (m : shape, drop 1 fs)  
                              else (m : init shape, fs)
           m = movePixel h p
           p = head shape
+          f = head fs
 
 move :: Heading -> Float -> Point -> Point
 move North dist (x, y) = (x, y + dist)
@@ -95,11 +96,27 @@ move South dist (x, y) = (x, y - dist)
 movePixel :: Heading -> Point -> Point
 movePixel h = move h pixelsize
 
+randomCoords :: StdGen -> Float -> (Int, Int) -> (Int, Int) -> [Point]
+randomCoords gen gridsize xbound ybound = zip xs ys
+    where xs = grid xrange
+          ys = grid yrange
+          xrange = randomRs xbound gx
+          yrange = randomRs ybound gy
+          (gx, gy) = split gen
+          grid = map fromIntegral . filter fitgrid
+          fitgrid = (==0) . flip mod (round gridsize)
+
+newGame rnd (w, h) = initGame {food = fs}
+    where fs = randomCoords rnd pixelsize xlim ylim
+          (xlim, ylim) = (lim w, lim h)
+          lim n = let n' = n `div` 2 in (-n', n')
+
 main :: IO ()
 main = do
+    g <- newStdGen
+    dim <- getScreenSize
+    let game = newGame g dim
     play FullScreen bg fps game render handle update
     where bg = black
           fps = 60
-          game = initGame
-
 
