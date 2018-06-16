@@ -19,7 +19,8 @@ data Game = Game {
                 snake :: Snake,
                 speed :: Float, 
                 lastDraw :: Time,
-                changeHead :: [Heading]
+                changeHead :: [Heading],
+                food :: [Point]
             }
 data Snake = Snake {                
                 shape :: Path,
@@ -28,7 +29,6 @@ data Snake = Snake {
 
 data GameState = Running | Paused | GameOver
 
-data Pixel = Pixel Point Heading
 
 data Heading = North | East | South | West
 
@@ -41,25 +41,25 @@ instance Semigroup Heading where
 
 pixelsize = 20
 
-initSnake = Snake [(-2, 0), (-1, 0), (0, 0)] East 
-initGame = Game 0 0 Running initSnake 5 0 []
+initSnake = Snake [(0, 0), (0, 0), (0, 0)] East 
+initGame = Game 0 0 Running initSnake 5 0 [] [(-80, -400)]
 
 turn :: Snake -> Heading -> Snake
 turn s@Snake{..} direction = s {heading = heading <> direction}
 
 render :: Game -> Picture
-render Game{..} = drawSnake snake
+render Game{..} = pictures $ drawSnake snake ++ drawFood food
 
-drawSnake Snake{..} = map drawPixel shape & pictures
 
 pixelShape = rectangleSolid pixelsize pixelsize
-drawPixel (x, y) = pixelShape & translate x y & color white 
+foodShape = circleSolid (pixelsize/2)
+
+draw shape clr (x, y) = shape & translate x y & color clr
+drawPixel = draw pixelShape white
+drawFood = map (draw foodShape cyan)
+drawSnake Snake{..} = map drawPixel shape 
 
 handle :: Event -> Game -> Game
--- handle (EventKey (SpecialKey KeyUp    ) Down _ _) g@Game{..} = g {snake = turn snake North}
--- handle (EventKey (SpecialKey KeyRight ) Down _ _) g@Game{..} = g {snake = turn snake East }
--- handle (EventKey (SpecialKey KeyDown  ) Down _ _) g@Game{..} = g {snake = turn snake South}
--- handle (EventKey (SpecialKey KeyLeft  ) Down _ _) g@Game{..} = g {snake = turn snake West }
 handle (EventKey (SpecialKey KeyUp    ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [North]}
 handle (EventKey (SpecialKey KeyRight ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [East] }
 handle (EventKey (SpecialKey KeyDown  ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [South]}
@@ -67,20 +67,24 @@ handle (EventKey (SpecialKey KeyLeft  ) Down _ _) g@Game{..} = g {changeHead = c
 handle _ game = game
 
 update :: Time -> Game -> Game
-update dt g@Game{..} = g {snake = refresh . newHeading $ snake,
-                          age = age + dt, 
-                          lastDraw = if doUpdate then age else lastDraw,
-                          changeHead = if doUpdate && not (null changeHead) then tail changeHead else changeHead
-                          }
-    where refresh x  = if doUpdate then updateSnake x else x
-          newHeading x = if doUpdate && not (null changeHead) then turn x (head changeHead) else x
+update dt g@Game{..} = trace (show . head . shape $ snake) $ up g {age = age + dt}
+    where newHeading x = if not (null changeHead) then turn x (head changeHead) else x
           doUpdate = lastDraw + period < age
           period = 1 / speed
+          up x | doUpdate  = x {snake = newHeading snake',
+                                food = food',
+                               lastDraw = age,
+                               changeHead = if not (null changeHead) then tail changeHead else changeHead
+                               } 
+               | otherwise = x
+          (snake', food') = eat food snake
 
-updateSnake :: Snake -> Snake
-updateSnake s@Snake{..}= s {shape = shape'}
-    where shape' = movePixel heading hd : init shape           
-          hd = head shape
+eat fs (Snake shape h) = (Snake shape' h,  food')
+    where (shape', food') = if m `elem` fs 
+                             then (m : shape, (0, 0) : [f | f <- fs, f /= m])  
+                             else (m : init shape, fs)
+          m = movePixel h p
+          p = head shape
 
 move :: Heading -> Float -> Point -> Point
 move North dist (x, y) = (x, y + dist)
