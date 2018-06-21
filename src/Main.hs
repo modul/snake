@@ -84,8 +84,9 @@ update dt g@Game{..} = up g {age = age + dt}
           period = 1 / speed
           up x | doUpdate  = x {snake = newHeading snake',
                                 food = food',
-                               lastDraw = age,
-                               changeHead = if not (null changeHead) then tail changeHead else changeHead
+                                lastDraw = age,
+                                changeHead = if not (null changeHead) then tail changeHead else changeHead,
+                                state = collision snake
                                } 
                | otherwise = x
           (snake', food') = eat food snake
@@ -97,6 +98,12 @@ eat fs (Snake shape h) = (Snake shape' h,  food')
           m = movePixel h p
           p = head shape
           f = head fs
+
+collision :: Snake -> GameState
+collision (Snake (s:ss) h) = if hit then GameOver else Running
+    where hit = m `elem` obst
+          m = movePixel h s
+          obst = s:ss
 
 move :: Heading -> Float -> Point -> Point
 move North dist (x, y) = (x, y + dist)
