@@ -28,7 +28,7 @@ data Snake = Snake {
                 heading :: Heading
                 }
 
-data GameState = Running | Paused | GameOver
+data GameState = Running | Paused | GameOver deriving (Eq, Show)
 
 
 data Heading = North | East | South | West
@@ -49,27 +49,38 @@ turn :: Snake -> Heading -> Snake
 turn s@Snake{..} direction = s {heading = heading <> direction}
 
 render :: Game -> Picture
-render Game{..} = pictures $ drawFood food : drawSnake snake 
+render Game{..} = pictures $ drawState state : drawFood food : drawSnake snake 
 
+borderShape = rectangleWire pixelsize pixelsize
 pixelShape = rectangleSolid pixelsize pixelsize
 foodShape = circleSolid (pixelsize/2)
 
 draw shape clr (x, y) = shape & translate x y & color clr
 drawPixel = draw pixelShape white
+drawBorder = draw borderShape (dim white)
 drawFood = draw foodShape cyan . head
-drawSnake Snake{..} = map drawPixel shape 
+drawSnake Snake{..} = map drawPixel shape ++ map drawBorder shape
+
+drawState Paused = text "Paused" & color red
+drawState GameOver = text "Game Over" & color red
+drawState _ = blank
 
 handle :: Event -> Game -> Game
 handle (EventKey (SpecialKey KeyUp    ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [North]}
 handle (EventKey (SpecialKey KeyRight ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [East] }
 handle (EventKey (SpecialKey KeyDown  ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [South]}
 handle (EventKey (SpecialKey KeyLeft  ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [West] }
+handle (EventKey (SpecialKey KeySpace ) Down _ _) g@Game{..} = g {state = case state of 
+                                                                            Paused -> Running
+                                                                            Running -> Paused
+                                                                            otherwise -> state
+                                                                 }
 handle _ game = game
 
 update :: Time -> Game -> Game
 update dt g@Game{..} = up g {age = age + dt}
     where newHeading x = if not (null changeHead) then turn x (head changeHead) else x
-          doUpdate = lastDraw + period < age
+          doUpdate = lastDraw + period < age && state == Running
           period = 1 / speed
           up x | doUpdate  = x {snake = newHeading snake',
                                 food = food',
