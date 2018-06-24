@@ -12,6 +12,7 @@ import Data.Semigroup
 import System.Random
 
 type Time = Float
+type Dimensions = (Float, Float)
 
 data Game = Game {
                 age :: Time,
@@ -21,7 +22,8 @@ data Game = Game {
                 speed :: Float, 
                 lastDraw :: Time,
                 changeHead :: [Heading],
-                food :: [Point]
+                food :: [Point],
+                dimensions :: Dimensions
             }
 data Snake = Snake {                
                 shape :: Path,
@@ -43,7 +45,7 @@ instance Semigroup Heading where
 pixelsize = 20
 
 initSnake = Snake [(0, 0), (0, 0), (0, 0)] East 
-initGame = Game 0 0 Running initSnake 10 0 [] [(-80, -400)]
+initGame dim = Game 0 0 Running initSnake 10 0 [] [(-80, -400)] dim
 
 turn :: Snake -> Heading -> Snake
 turn s@Snake{..} direction = s {heading = heading <> direction}
@@ -89,7 +91,7 @@ update dt g@Game{..} = up g {age = age + dt}
                                 state = collision snake
                                } 
                | otherwise = x
-          (snake', food') = eat food snake
+          (snake', food') = eat food . warp dimensions $ snake
 
 eat fs (Snake shape h) = (Snake shape' h,  food')
     where (shape', food') = if m == f 
@@ -104,6 +106,21 @@ collision (Snake (s:ss) h) = if hit then GameOver else Running
     where hit = m `elem` obst
           m = movePixel h s
           obst = s:ss
+
+warp :: Dimensions -> Snake -> Snake
+warp (dx, dy) s@Snake{..} = s {shape = (hx', hy'):tail shape}
+    where (hx, hy) = head shape
+          hx' = bound l r hx
+          hy' = bound b t hy
+          r = dx/2 
+          t = dy/2
+          l = -r
+          b = -t
+
+bound :: Float -> Float -> Float -> Float
+bound min max val | val > max = min
+                  | val < min = max
+                  | otherwise = val
 
 move :: Heading -> Float -> Point -> Point
 move North dist (x, y) = (x, y + dist)
@@ -124,10 +141,12 @@ randomCoords gen gridsize xbound ybound = zip xs ys
           grid = map fromIntegral . filter fitgrid
           fitgrid = (==0) . flip mod (round gridsize)
 
-newGame rnd (w, h) = initGame {food = fs}
+newGame rnd (w, h) = game {food = fs}
     where fs = randomCoords rnd pixelsize xlim ylim
           (xlim, ylim) = (lim w, lim h)
           lim n = let n' = n `div` 2 in (-n', n')
+          game = initGame (fit w, fit h)
+          fit = (*pixelsize) . fromIntegral . round . (/pixelsize) . fromIntegral
 
 main :: IO ()
 main = do
