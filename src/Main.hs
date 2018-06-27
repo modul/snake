@@ -51,7 +51,7 @@ turn :: Snake -> Heading -> Snake
 turn s@Snake{..} direction = s {heading = heading <> direction}
 
 render :: Game -> Picture
-render Game{..} = pictures $ drawState state : drawFood food : drawSnake snake 
+render Game{..} = pictures $ drawState state : drawScore dimensions points : drawFood food : drawSnake snake 
 
 borderShape = rectangleWire pixelsize pixelsize
 pixelShape = rectangleSolid pixelsize pixelsize
@@ -66,6 +66,12 @@ drawSnake Snake{..} = map drawPixel shape ++ map drawBorder shape
 drawState Paused = text "Paused" & color red
 drawState GameOver = text "Game Over" & color red
 drawState _ = blank
+
+drawScore (w, h) score = text (show score) 
+                       & color (dim white)
+                       & scale 0.5 0.5
+                       & translate (-10) (-h/2 + 10)
+                    
 
 handle :: Event -> Game -> Game
 handle (EventKey (SpecialKey KeyUp    ) Down _ _) g@Game{..} = g {changeHead = changeHead ++ [North]}
@@ -87,6 +93,7 @@ update dt g@Game{..} = up g {age = age + dt}
           up x | doUpdate  = x {snake = newHeading snake',
                                 food = food',
                                 lastDraw = age,
+                                points = 10 * length (shape snake') - 30,
                                 changeHead = if not (null changeHead) then tail changeHead else changeHead,
                                 state = collision snake
                                } 
