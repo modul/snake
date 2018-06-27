@@ -140,20 +140,22 @@ movePixel h = move h pixelsize
 
 randomCoords :: StdGen -> Float -> (Int, Int) -> (Int, Int) -> [Point]
 randomCoords gen gridsize xbound ybound = zip xs ys
-    where xs = grid xrange
-          ys = grid yrange
+    where xs = map fitgrid xrange
+          ys = map fitgrid yrange
           xrange = randomRs xbound gx
           yrange = randomRs ybound gy
           (gx, gy) = split gen
-          grid = map fromIntegral . filter fitgrid
-          fitgrid = (==0) . flip mod (round gridsize)
 
 newGame rnd (w, h) = game {food = fs}
     where fs = randomCoords rnd pixelsize xlim ylim
           (xlim, ylim) = (lim w, lim h)
           lim n = let n' = n `div` 2 in (-n', n')
-          game = initGame (fit w, fit h)
-          fit = (*pixelsize) . fromIntegral . round . (/pixelsize) . fromIntegral
+          game = initGame (fitgrid w, fitgrid h)
+
+mkMultipleOf :: Float -> Int -> Float
+mkMultipleOf i = (*i) . fromIntegral . round . (/i) . fromIntegral
+
+fitgrid = mkMultipleOf pixelsize
 
 main :: IO ()
 main = do
